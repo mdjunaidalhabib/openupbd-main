@@ -74,6 +74,7 @@ async function proxy(req, context) {
       headers.get("location"),
       req,
     );
+
     if (rewrittenLocation) {
       headers.set("location", rewrittenLocation);
     }
@@ -88,6 +89,8 @@ async function proxy(req, context) {
       {
         success: false,
         message: "Failed to connect to backend API.",
+        targetUrl,
+        backendApiUrl: BACKEND_API_URL,
         error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 502 },
