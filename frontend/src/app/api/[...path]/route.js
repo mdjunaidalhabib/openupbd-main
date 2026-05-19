@@ -13,8 +13,6 @@ function getMissingBackendUrlResponse() {
 }
 
 function buildBackendUrl(pathSegments = [], search = "") {
-  if (!BACKEND_API_URL) return "";
-
   const base = BACKEND_API_URL.replace(/\/$/, "");
   const path = pathSegments.map(encodeURIComponent).join("/");
 
@@ -36,57 +34,36 @@ function copyRequestHeaders(req) {
   return headers;
 }
 
-function rewriteLocationHeader(location, req) {
-  if (!location || !BACKEND_API_URL) return location;
-
-  const backendBase = BACKEND_API_URL.replace(/\/$/, "");
-  const origin = new URL(req.url).origin;
-
-  return location.startsWith(backendBase)
-    ? location.replace(backendBase, `${origin}/api`)
-    : location;
-}
-
 async function proxy(req, context) {
   if (!BACKEND_API_URL) {
     return getMissingBackendUrlResponse();
   }
 
-  const params = context?.params || {};
-  const pathSegments = Array.isArray(params.path) ? params.path : [];
+  const params = await context.params;
+  const pathSegments = Array.isArray(params?.path) ? params.path : [];
 
   const targetUrl = buildBackendUrl(pathSegments, new URL(req.url).search);
   const method = req.method.toUpperCase();
 
-  const init = {
-    method,
-    headers: copyRequestHeaders(req),
-    redirect: "manual",
-    cache: "no-store",
-    signal: AbortSignal.timeout(15000),
-  };
-
-  if (!["GET", "HEAD"].includes(method)) {
-    init.body = await req.arrayBuffer();
-  }
-
   try {
-    const backendRes = await fetch(targetUrl, init);
+    const init = {
+      method,
+      headers: copyRequestHeaders(req),
+      redirect: "manual",
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    };
 
+    if (!["GET", "HEAD"].includes(method)) {
+      init.body = await req.arrayBuffer();
+    }
+
+    const backendRes = await fetch(targetUrl, init);
     const headers = new Headers(backendRes.headers);
 
     headers.delete("content-encoding");
     headers.delete("content-length");
     headers.delete("transfer-encoding");
-
-    const rewrittenLocation = rewriteLocationHeader(
-      headers.get("location"),
-      req,
-    );
-
-    if (rewrittenLocation) {
-      headers.set("location", rewrittenLocation);
-    }
 
     const body = await backendRes.arrayBuffer();
 
