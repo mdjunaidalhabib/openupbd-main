@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 
-const BACKEND_API_URL = process.env.BACKEND_API_URL || process.env.API_URL || "http://localhost:4000";
+const BACKEND_API_URL = process.env.BACKEND_API_URL;
+
+function getMissingBackendUrlResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Backend API URL is missing. Please set BACKEND_API_URL.",
+    },
+    { status: 500 },
+  );
+}
 
 function buildBackendUrl(pathSegments = [], search = "") {
   const base = BACKEND_API_URL.replace(/\/$/, "");
@@ -10,23 +20,36 @@ function buildBackendUrl(pathSegments = [], search = "") {
 
 function copyRequestHeaders(req) {
   const headers = new Headers(req.headers);
+
   headers.delete("host");
   headers.delete("connection");
   headers.delete("content-length");
   headers.delete("accept-encoding");
+
   return headers;
 }
 
 function rewriteLocationHeader(location, req) {
-  if (!location) return location;
+  if (!location || !BACKEND_API_URL) return location;
+
   const backendBase = BACKEND_API_URL.replace(/\/$/, "");
   const origin = new URL(req.url).origin;
-  return location.startsWith(backendBase) ? location.replace(backendBase, `${origin}/api`) : location;
+
+  return location.startsWith(backendBase)
+    ? location.replace(backendBase, `${origin}/api`)
+    : location;
 }
 
 async function proxy(req, context) {
+  if (!BACKEND_API_URL) {
+    return getMissingBackendUrlResponse();
+  }
+
   const params = await context.params;
-  const targetUrl = buildBackendUrl(params?.path || [], new URL(req.url).search);
+  const targetUrl = buildBackendUrl(
+    params?.path || [],
+    new URL(req.url).search,
+  );
   const method = req.method.toUpperCase();
 
   const init = {
@@ -40,19 +63,36 @@ async function proxy(req, context) {
     init.body = await req.arrayBuffer();
   }
 
-  const backendRes = await fetch(targetUrl, init);
-  const headers = new Headers(backendRes.headers);
-  headers.delete("content-encoding");
-  headers.delete("content-length");
+  try {
+    const backendRes = await fetch(targetUrl, init);
 
-  const rewrittenLocation = rewriteLocationHeader(headers.get("location"), req);
-  if (rewrittenLocation) headers.set("location", rewrittenLocation);
+    const headers = new Headers(backendRes.headers);
+    headers.delete("content-encoding");
+    headers.delete("content-length");
 
-  return new NextResponse(backendRes.body, {
-    status: backendRes.status,
-    statusText: backendRes.statusText,
-    headers,
-  });
+    const rewrittenLocation = rewriteLocationHeader(
+      headers.get("location"),
+      req,
+    );
+    if (rewrittenLocation) {
+      headers.set("location", rewrittenLocation);
+    }
+
+    return new NextResponse(backendRes.body, {
+      status: backendRes.status,
+      statusText: backendRes.statusText,
+      headers,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to connect to backend API.",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 502 },
+    );
+  }
 }
 
 export const dynamic = "force-dynamic";

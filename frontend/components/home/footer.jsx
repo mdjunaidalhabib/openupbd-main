@@ -14,14 +14,12 @@ import {
   FaEnvelope,
   FaGlobe,
   FaMapMarkerAlt,
+  FaUserCircle,
 } from "react-icons/fa";
 
 const socialLinksData = [
   { Icon: FaFacebookF, url: "https://www.facebook.com/openupbd" },
-  {
-    Icon: FaUsers,
-    url: "https://www.facebook.com/share/g/17mB3XsdQR",
-  },
+  { Icon: FaUsers, url: "https://www.facebook.com/share/g/17mB3XsdQR" },
   { Icon: FaYoutube, url: "https://youtube.com/@openupbd" },
   { Icon: FaInstagram, url: "https://instagram.com/openupbd" },
   { Icon: FaTiktok, url: "https://tiktok.com/@openupbd.com" },
@@ -41,14 +39,15 @@ export default function Footer() {
   useEffect(() => {
     const controller = new AbortController();
 
-    const apiBase = "/api";
-    const apiUrl = `${apiBase}/footer`;
-
     const fetchData = async () => {
       try {
-        const footerRes = await fetch(apiUrl, {
+        const footerRes = await fetch("/api/footer", {
           signal: controller.signal,
         });
+
+        if (!footerRes.ok) {
+          throw new Error(`Footer API failed: ${footerRes.status}`);
+        }
 
         const footerJson = await footerRes.json();
         setData(footerJson);
@@ -72,8 +71,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-pink-100 text-gray-900 pt-10 pb-2 px-4 md:px-12 mb-14 md:mb-0">
-      <div className=" mx-auto w-full md:max-w-[680] lg:max-w-[768] xl:max-w-[1080px] 2xl:max-w-[1280px] grid grid-cols-1 md:grid-cols-3 gap-10">
-        {/* BRAND */}
+      <div className="mx-auto w-full md:max-w-[680px] lg:max-w-[768px] xl:max-w-[1080px] 2xl:max-w-[1280px] grid grid-cols-1 md:grid-cols-3 gap-10">
         <div>
           <div className="flex items-center gap-3 mb-3">
             {brand.logo && !imgError ? (
@@ -115,7 +113,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* QUICK LINKS */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Quick Links</h2>
           <ul className="space-y-2 text-sm">
@@ -129,7 +126,6 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* CONTACT */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Contact Us</h2>
           <ul className="space-y-2 text-sm">

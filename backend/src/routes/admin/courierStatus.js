@@ -27,6 +27,12 @@ async function getActiveCourier(courier = "steadfast") {
   return setting;
 }
 
+/* ======================================================
+   🌐 Helper: Fetch Steadfast delivery status (V1 doc)
+   Base: https://portal.packzy.com/api/v1
+   - /status_by_cid/{id}
+   - /status_by_trackingcode/{trackingCode}
+====================================================== */
 async function fetchSteadfastStatus({
   apiKey,
   secretKey,
@@ -69,6 +75,13 @@ async function fetchSteadfastStatus({
   };
 }
 
+/* ======================================================
+   ✅ GET /admin/api/courier/status?trackingId=...
+   - Find order
+   - Call Steadfast status endpoint (live)
+   - Update DB: order.courier.status
+   - Return latest status
+====================================================== */
 router.get("/status", async (req, res) => {
   const { trackingId } = req.query;
 

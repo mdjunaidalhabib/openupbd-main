@@ -40,6 +40,7 @@ router.get("/live", async (req, res) => {
     try {
       data = JSON.parse(raw);
     } catch {
+      console.log("❌ Failed to parse JSON from steadfast");
     }
 
     // If tracking data exists

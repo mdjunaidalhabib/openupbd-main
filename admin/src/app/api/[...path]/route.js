@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const BACKEND_API_URL = process.env.BACKEND_API_URL || process.env.API_URL || "http://localhost:4000";
+const BACKEND_API_URL = process.env.BACKEND_API_URL;
 
 function buildBackendUrl(pathSegments = [], search = "") {
   const base = BACKEND_API_URL.replace(/\/$/, "");
@@ -21,12 +21,17 @@ function rewriteLocationHeader(location, req) {
   if (!location) return location;
   const backendBase = BACKEND_API_URL.replace(/\/$/, "");
   const origin = new URL(req.url).origin;
-  return location.startsWith(backendBase) ? location.replace(backendBase, `${origin}/api`) : location;
+  return location.startsWith(backendBase)
+    ? location.replace(backendBase, `${origin}/api`)
+    : location;
 }
 
 async function proxy(req, context) {
   const params = await context.params;
-  const targetUrl = buildBackendUrl(params?.path || [], new URL(req.url).search);
+  const targetUrl = buildBackendUrl(
+    params?.path || [],
+    new URL(req.url).search,
+  );
   const method = req.method.toUpperCase();
 
   const init = {

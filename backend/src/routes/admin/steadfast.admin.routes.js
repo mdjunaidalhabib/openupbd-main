@@ -5,6 +5,14 @@ import Order from "../../models/Order.js";
 const router = express.Router();
 
 /* ======================================================
+   🪵 DEBUG LOGGER
+====================================================== */
+router.use((req, res, next) => {
+  console.log("🚚 STEADFAST ROUTE HIT:", req.method, req.originalUrl);
+  next();
+});
+
+/* ======================================================
    🔑 Helper: Get active courier config
 ====================================================== */
 async function getActiveCourier(courier = "steadfast") {
@@ -25,6 +33,7 @@ async function getActiveCourier(courier = "steadfast") {
     throw err;
   }
 
+  console.log("✅ Active courier found:", setting.courier);
   return setting;
 }
 
@@ -45,6 +54,7 @@ function safeJsonParse(raw) {
 ====================================================== */
 router.post("/send-order", async (req, res) => {
   const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  console.log("📥 STEADFAST SEND ORDER HIT, requestId:", requestId);
 
   try {
     const {
@@ -158,6 +168,7 @@ router.post("/send-order", async (req, res) => {
 ====================================================== */
 router.post("/sync-courier-final", async (req, res) => {
   const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  console.log("🔄 COURIER FINAL SYNC HIT:", requestId);
 
   try {
     const { orderId, finalStatus } = req.body || {};
@@ -203,6 +214,9 @@ router.post("/sync-courier-final", async (req, res) => {
     }
 
     await order.save();
+
+    console.log("✅ Courier final status synced:", order._id);
+
     return res.json({
       ok: true,
       requestId,
