@@ -1,0 +1,218 @@
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import FooterSkeleton from "../skeletons/FooterSkeleton";
+import { useEffect, useState } from "react";
+import {
+  FaFacebookF,
+  FaUsers,
+  FaYoutube,
+  FaInstagram,
+  FaTiktok,
+  FaPhoneAlt,
+  FaEnvelope,
+  FaGlobe,
+  FaMapMarkerAlt,
+} from "react-icons/fa";
+
+const socialLinksData = [
+  { Icon: FaFacebookF, url: "https://www.facebook.com/openupbd" },
+  {
+    Icon: FaUsers,
+    url: "https://www.facebook.com/share/g/17mB3XsdQR",
+  },
+  { Icon: FaYoutube, url: "https://youtube.com/@openupbd" },
+  { Icon: FaInstagram, url: "https://instagram.com/openupbd" },
+  { Icon: FaTiktok, url: "https://tiktok.com/@openupbd.com" },
+];
+
+const quickLinksData = [
+  { label: "Home", href: "/" },
+  { label: "Shop", href: "/products" },
+  { label: "Categories", href: "/categories" },
+];
+
+export default function Footer() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const apiBase = "/api";
+    const apiUrl = `${apiBase}/footer`;
+
+    const fetchData = async () => {
+      try {
+        const footerRes = await fetch(apiUrl, {
+          signal: controller.signal,
+        });
+
+        const footerJson = await footerRes.json();
+        setData(footerJson);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("❌ Failed to load footer", err);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => controller.abort();
+  }, []);
+
+  if (loading) return <FooterSkeleton />;
+  if (!data) return null;
+
+  const { brand = {}, contact = {} } = data;
+
+  return (
+    <footer className="bg-pink-100 text-gray-900 pt-10 pb-2 px-4 md:px-12 mb-14 md:mb-0">
+      <div className=" mx-auto w-full md:max-w-[680] lg:max-w-[768] xl:max-w-[1080px] 2xl:max-w-[1280px] grid grid-cols-1 md:grid-cols-3 gap-10">
+        {/* BRAND */}
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            {brand.logo && !imgError ? (
+              <Image
+                src={brand.logo}
+                alt={brand?.title || "Brand Logo"}
+                width={40}
+                height={40}
+                loading="lazy"
+                className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center bg-pink-50 rounded-lg">
+                <FaUserCircle className="text-gray-400 w-6 h-6" />
+              </div>
+            )}
+
+            <span className="text-xl font-bold text-pink-600 block min-w-[100px] truncate">
+              {brand.title || "Your business name"}
+            </span>
+          </div>
+
+          <p className="text-sm mb-4">
+            {brand.about || "Your business destination."}
+          </p>
+
+          <div className="flex gap-4 text-xl">
+            {socialLinksData.map(({ Icon, url }, idx) => (
+              <Link
+                key={idx}
+                href={url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon className="hover:text-pink-600" />
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* QUICK LINKS */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Quick Links</h2>
+          <ul className="space-y-2 text-sm">
+            {quickLinksData.map((item, i) => (
+              <li key={i}>
+                <Link href={item.href} className="hover:text-pink-600">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* CONTACT */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Contact Us</h2>
+          <ul className="space-y-2 text-sm">
+            {contact.address && (
+              <li className="flex items-center gap-2">
+                <FaMapMarkerAlt />
+                <a
+                  href="https://maps.app.goo.gl/Qvc2AX1ELx5JCaWY9?g_st=ipc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-pink-600"
+                >
+                  {contact.address}
+                </a>
+              </li>
+            )}
+
+            {contact.phone && (
+              <li className="flex items-center gap-2">
+                <FaPhoneAlt />
+                <a
+                  href={`tel:${contact.phone}`}
+                  className="hover:text-pink-600"
+                >
+                  {contact.phone}
+                </a>
+              </li>
+            )}
+
+            {contact.email && (
+              <li className="flex items-center gap-2">
+                <FaEnvelope />
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="hover:text-pink-600"
+                >
+                  {contact.email}
+                </a>
+              </li>
+            )}
+
+            {contact.website && (
+              <li className="flex items-center gap-2">
+                <FaGlobe />
+                <a
+                  href={
+                    contact.website.startsWith("http")
+                      ? contact.website
+                      : `https://${contact.website}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-pink-600"
+                >
+                  {contact.website}
+                </a>
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <hr className="border-t border-gray-400 mt-6" />
+
+      <div className="mt-2 text-center text-xs text-gray-700 px-2 whitespace-normal break-words sm:whitespace-nowrap sm:overflow-hidden sm:text-ellipsis">
+        <span className="block sm:inline">
+          © {new Date().getFullYear()} All Rights Reserved {brand.title}
+        </span>
+
+        <span className="hidden sm:inline mx-1 text-gray-400">•</span>
+
+        <span className="block sm:inline text-gray-600">
+          Developed by{" "}
+          <a
+            href="https://hikmahit.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-pink-600 hover:underline underline-offset-4"
+          >
+            Hikmah IT
+          </a>
+        </span>
+      </div>
+    </footer>
+  );
+}
