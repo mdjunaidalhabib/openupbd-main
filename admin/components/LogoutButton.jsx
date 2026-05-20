@@ -1,32 +1,35 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LogoutButton() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
     try {
       setLoading(true);
-      const apiUrl = "/api";
 
-      const res = await fetch(`${apiUrl}/admin/logout`, {
+      const res = await fetch("/api/admin/logout", {
         method: "POST",
-        credentials: "include", // ✅ cookie delete হবে
+        credentials: "include",
+        cache: "no-store",
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const err = await res.json();
-        console.error("Logout failed:", err.message);
+        console.error("❌ Logout failed:", data?.message);
+        alert(data?.message || "Logout failed");
         return;
       }
 
       console.log("✅ Logout successful");
-      router.push("/login"); // ❌ router.refresh() দরকার নেই
+
+      // browser cache + middleware refresh
+      window.location.href = "/login";
     } catch (error) {
-      console.error("Logout Error:", error);
+      console.error("❌ Logout Error:", error);
+      alert("Something went wrong during logout");
     } finally {
       setLoading(false);
     }
