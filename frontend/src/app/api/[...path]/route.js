@@ -15,23 +15,33 @@ function getMissingBackendUrlResponse() {
 function buildBackendUrl(pathSegments = [], search = "") {
   const base = BACKEND_API_URL.replace(/\/$/, "");
   const path = pathSegments.map(encodeURIComponent).join("/");
-
   return `${base}/${path}${search || ""}`;
 }
 
 function copyRequestHeaders(req) {
-  const headers = new Headers();
+  const headers = new Headers(req.headers);
 
-  const contentType = req.headers.get("content-type");
-  const authorization = req.headers.get("authorization");
-  const accept = req.headers.get("accept");
+  headers.delete("host");
+  headers.delete("connection");
+  headers.delete("content-length");
+  headers.delete("accept-encoding");
 
-  if (contentType) headers.set("content-type", contentType);
-  if (authorization) headers.set("authorization", authorization);
-  if (accept) headers.set("accept", accept);
-  else headers.set("accept", "application/json");
+  if (!headers.get("accept")) {
+    headers.set("accept", "application/json");
+  }
 
   return headers;
+}
+
+function rewriteLocationHeader(location, req) {
+  if (!location) return location;
+
+  const backendBase = BACKEND_API_URL.replace(/\/$/, "");
+  const origin = new URL(req.url).origin;
+
+  return location.startsWith(backendBase)
+    ? location.replace(backendBase, `${origin}/api`)
+    : location;
 }
 
 async function proxy(req, context) {
@@ -51,7 +61,7 @@ async function proxy(req, context) {
       headers: copyRequestHeaders(req),
       redirect: "manual",
       cache: "no-store",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000),
     };
 
     if (!["GET", "HEAD"].includes(method)) {
@@ -65,9 +75,15 @@ async function proxy(req, context) {
     headers.delete("content-length");
     headers.delete("transfer-encoding");
 
-    const body = await backendRes.arrayBuffer();
+    const rewrittenLocation = rewriteLocationHeader(
+      headers.get("location"),
+      req,
+    );
+    if (rewrittenLocation) {
+      headers.set("location", rewrittenLocation);
+    }
 
-    return new NextResponse(body, {
+    return new NextResponse(backendRes.body, {
       status: backendRes.status,
       statusText: backendRes.statusText,
       headers,
