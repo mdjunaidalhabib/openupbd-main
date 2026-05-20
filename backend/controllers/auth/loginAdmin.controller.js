@@ -7,80 +7,108 @@ import geoip from "geoip-lite";
  * POST /admin/login
  */
 export const loginAdmin = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body || {};
+
+    console.log("ADMIN LOGIN HIT:", { email });
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "ইমেইল এবং পাসওয়ার্ড দুটোই দিতে হবে।",
+        errorType: "MISSING_CREDENTIALS",
+      });
+    }
+
     const admin = await Admin.findOne({ email });
+
     if (!admin) {
-      return res.status(401).json({ message: "❌ ভুল ইমেইল দেওয়া হয়েছে" });
+      return res.status(401).json({
+        success: false,
+        message: "এই ইমেইল দিয়ে কোনো অ্যাডমিন পাওয়া যায়নি।",
+        errorType: "ADMIN_NOT_FOUND",
+      });
     }
 
     const isMatch = await admin.matchPassword(password);
+
     if (!isMatch) {
-      return res.status(401).json({ message: "🔒 ভুল পাসওয়ার্ড দেওয়া হয়েছে" });
+      return res.status(401).json({
+        success: false,
+        message: "পাসওয়ার্ড ভুল হয়েছে। আবার চেষ্টা করুন।",
+        errorType: "INVALID_PASSWORD",
+      });
     }
-
-    const ip =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.socket?.remoteAddress ||
-      req.ip;
-
-    const uaString = req.headers["user-agent"] || "";
-    const parser = new UAParser(uaString);
-    const ua = parser.getResult();
-
-    const deviceType =
-      ua.device.type === "mobile"
-        ? "Mobile"
-        : ua.device.type === "tablet"
-        ? "Tablet"
-        : "PC";
-
-    const osName = ua.os.name || "Unknown OS";
-    const osVersion = ua.os.version || "";
-    const browserName = ua.browser.name || "Unknown Browser";
-    const browserVersion = ua.browser.version || "";
-
-    const geo = geoip.lookup(ip);
-    const location = geo
-      ? {
-          country: geo.country,
-          city: geo.city,
-          region: geo.region,
-          lat: geo.ll?.[0],
-          lon: geo.ll?.[1],
-        }
-      : null;
-
-    // ✅ save login info
-    admin.lastLoginAt = new Date();
-    admin.lastLoginIp = ip;
-    admin.lastLoginDevice = deviceType;
-    admin.lastLoginOS = `${osName} ${osVersion}`.trim();
-    admin.lastLoginBrowser = `${browserName} ${browserVersion}`.trim();
-    admin.lastLoginUA = uaString;
-    if (location) admin.lastLoginLocation = location;
-
-    await admin.save();
 
     const token = generateToken(admin);
 
-    const isProd = process.env.NODE_ENV === "production";
-    const cookieDomain = process.env.COOKIE_DOMAIN;
-
     const cookieOptions = {
       httpOnly: true,
-      secure: isProd ? true : false,
-      sameSite: isProd ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      ...(isProd && cookieDomain ? { domain: cookieDomain } : {}),
     };
 
     res.cookie("admin_token", token, cookieOptions);
 
+    // Login tracking fail হলেও login fail করবে না
+    try {
+      const ip =
+        req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        req.ip ||
+        "";
+
+      const uaString = req.headers["user-agent"] || "";
+      const parser = new UAParser(uaString);
+      const ua = parser.getResult();
+
+      const deviceType =
+        ua.device.type === "mobile"
+          ? "Mobile"
+          : ua.device.type === "tablet"
+            ? "Tablet"
+            : "PC";
+
+      const osName = ua.os.name || "Unknown OS";
+      const osVersion = ua.os.version || "";
+      const browserName = ua.browser.name || "Unknown Browser";
+      const browserVersion = ua.browser.version || "";
+
+      const geo = ip ? geoip.lookup(ip) : null;
+      const location = geo
+        ? {
+            country: geo.country,
+            city: geo.city,
+            region: geo.region,
+            lat: geo.ll?.[0],
+            lon: geo.ll?.[1],
+          }
+        : null;
+
+      admin.lastLoginAt = new Date();
+      admin.lastLoginIp = ip;
+      admin.lastLoginDevice = deviceType;
+      admin.lastLoginOS = `${osName} ${osVersion}`.trim();
+      admin.lastLoginBrowser = `${browserName} ${browserVersion}`.trim();
+      admin.lastLoginUA = uaString;
+
+      if (location) {
+        admin.lastLoginLocation = location;
+      }
+
+      await admin.save();
+    } catch (trackingError) {
+      console.error("LOGIN TRACKING SAVE ERROR:", {
+        name: trackingError?.name,
+        message: trackingError?.message,
+      });
+    }
+
     return res.status(200).json({
-      message: "✅ লগইন সফল হয়েছে!",
+      success: true,
+      message: "লগইন সফল হয়েছে।",
       admin: {
         id: admin._id,
         name: admin.name,
@@ -95,7 +123,42 @@ export const loginAdmin = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ Login Error:", err);
-    return res.status(500).json({ message: "⚠️ সার্ভারে কিছু সমস্যা হয়েছে" });
+    console.error("LOGIN REAL ERROR:", {
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack,
+    });
+
+    if (
+      err?.message?.toLowerCase().includes("jwt") ||
+      err?.message?.toLowerCase().includes("secret")
+    ) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "লগইন টোকেন তৈরি করতে সমস্যা হয়েছে। Backend JWT_SECRET env check করুন।",
+        errorType: "JWT_ERROR",
+      });
+    }
+
+    if (
+      err?.name === "MongoServerError" ||
+      err?.name === "MongoNetworkError" ||
+      err?.name === "MongooseServerSelectionError"
+    ) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "ডাটাবেজ কানেকশনে সমস্যা হয়েছে। MongoDB env/connection check করুন।",
+        errorType: "DATABASE_ERROR",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "সার্ভারে অপ্রত্যাশিত সমস্যা হয়েছে। Backend logs check করুন।",
+      errorType: "SERVER_ERROR",
+      details: process.env.NODE_ENV === "production" ? undefined : err?.message,
+    });
   }
 };
