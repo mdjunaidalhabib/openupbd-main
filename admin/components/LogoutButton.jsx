@@ -25,8 +25,25 @@ export default function LogoutButton() {
 
       console.log("✅ Logout successful");
 
-      // browser cache + middleware refresh
-      window.location.href = "/login";
+      // ✅ Browser cookie force remove
+      document.cookie =
+        "admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+      // ✅ Clear storage/cache
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // ✅ Clear browser cache if supported
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
+
+        await Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName)),
+        );
+      }
+
+      // ✅ Hard reload + redirect
+      window.location.replace("/login");
     } catch (error) {
       console.error("❌ Logout Error:", error);
       alert("Something went wrong during logout");
