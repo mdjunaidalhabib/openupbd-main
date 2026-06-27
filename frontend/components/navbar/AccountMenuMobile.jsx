@@ -77,7 +77,9 @@ export default function AccountMenuMobile({ onOpen }) {
           />
           <span>{label}</span>
         </div>
-        {active && <div className="w-2 h-2 rounded-full bg-rose-500 transition-all duration-300" />}
+        {active && (
+          <div className="w-2 h-2 rounded-full bg-rose-500 transition-all duration-300" />
+        )}
       </Link>
     );
   };
@@ -135,11 +137,17 @@ export default function AccountMenuMobile({ onOpen }) {
                 ) : (
                   <FaUser className="w-8 h-8" />
                 )}
-                <span className="font-semibold text-lg truncate text-gray-800 ">{me.name}</span>
+                <span className="font-semibold text-lg truncate text-gray-800 ">
+                  {me.name}
+                </span>
               </div>
 
               <MenuItem href="/profile" label="My Profile" icon={FaUser} />
-              <MenuItem href="/orders" label="My Orders" icon={FaClipboardList} />
+              <MenuItem
+                href="/orders"
+                label="My Orders"
+                icon={FaClipboardList}
+              />
 
               <button
                 onClick={handleLogout}

@@ -19,7 +19,7 @@ export default function WishlistIcon({ wishlistCount, mobile }) {
           {wishlistCount}
         </span>
       )}
-      {mobile && <span>Wishlist</span>}
+      {mobile && <span></span>}
     </Link>
   );
 }

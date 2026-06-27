@@ -1,66 +1,520 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { apiFetch } from "../../utils/api";
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { FaShippingFast, FaShoppingBag, FaGift } from "react-icons/fa";
+
 import ProductCard from "./ProductCard";
 import ProductCardSkeleton from "../skeletons/ProductCardSkeleton";
-import { apiFetch } from "../../utils/api";
-import { motion } from "framer-motion";
-import Image from "next/image";
-import OfferBadges from "./OfferBadges";
 
+/* ══════════════════════════════════════════════════════════════
+   DRAG-SCROLL WRAPPER
+   ══════════════════════════════════════════════════════════════ */
+function DragScroll({ children, className = "" }) {
+  const elRef = useRef(null);
+  const state = useRef({
+    down: false,
+    moved: false,
+    startX: 0,
+    startScroll: 0,
+    lastX: 0,
+    lastT: 0,
+    vel: 0,
+    raf: null,
+  });
+
+  useEffect(() => {
+    const s = state.current;
+
+    const momentum = () => {
+      const el = elRef.current;
+      if (!el) return;
+      s.vel *= 0.92;
+      if (Math.abs(s.vel) < 0.4) {
+        s.vel = 0;
+        return;
+      }
+      el.scrollLeft += s.vel;
+      s.raf = requestAnimationFrame(momentum);
+    };
+
+    const onDown = (e) => {
+      e.preventDefault();
+      const el = elRef.current;
+      if (!el || !el.contains(e.target)) return;
+      cancelAnimationFrame(s.raf);
+      s.down = true;
+      s.moved = false;
+      s.startX = e.pageX;
+      s.startScroll = el.scrollLeft;
+      s.lastX = e.pageX;
+      s.lastT = performance.now();
+      s.vel = 0;
+      el.style.cursor = "grabbing";
+      el.style.userSelect = "none";
+    };
+
+    const onMove = (e) => {
+      if (!s.down) return;
+      const el = elRef.current;
+      if (!el) return;
+      const dx = e.pageX - s.startX;
+      if (Math.abs(dx) > 4) s.moved = true;
+      const now = performance.now();
+      const dt = now - s.lastT;
+      if (dt > 0) s.vel = ((s.lastX - e.pageX) / dt) * 14;
+      s.lastX = e.pageX;
+      s.lastT = now;
+      el.scrollLeft = s.startScroll - dx;
+      e.preventDefault();
+    };
+
+    const onUp = () => {
+      if (!s.down) return;
+      s.down = false;
+      const el = elRef.current;
+      if (el) {
+        el.style.cursor = "grab";
+        el.style.userSelect = "";
+      }
+      if (s.moved && Math.abs(s.vel) > 1) {
+        s.raf = requestAnimationFrame(momentum);
+      }
+    };
+
+    window.addEventListener("mousemove", onMove, { passive: false });
+    window.addEventListener("mouseup", onUp);
+    elRef.current?.addEventListener("mousedown", onDown, { passive: false });
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      elRef.current?.removeEventListener("mousedown", onDown);
+      cancelAnimationFrame(s.raf);
+    };
+  }, []);
+
+  const onClickCapture = (e) => {
+    if (state.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      state.current.moved = false;
+    }
+  };
+
+  const onWheel = (e) => {
+    const el = elRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      cancelAnimationFrame(state.current.raf);
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div
+      ref={elRef}
+      onClickCapture={onClickCapture}
+      onWheel={onWheel}
+      style={{
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        cursor: "grab",
+        WebkitUserDrag: "none",
+      }}
+      className={`no-scrollbar select-none ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CATEGORY ROW
+   ══════════════════════════════════════════════════════════════ */
+function CategoryRow({ cat, items, index = 0 }) {
+  const categoryHref = `/categories/${cat.slug || cat._id}`;
+
+  return (
+    <motion.section
+      id={`cat-${cat._id}`}
+      className="scroll-mt-20"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut", delay: index * 0.06 }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-800">
+          <span className="w-1 h-5 rounded-full bg-gradient-to-b from-blue-600 to-purple-600 inline-block" />
+          {cat.image && (
+            <span className="relative w-6 h-6 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={cat.image}
+                alt={cat.name}
+                fill
+                sizes="24px"
+                className="object-cover"
+                draggable={false}
+              />
+            </span>
+          )}
+          {cat.name}
+          <span className="text-xs sm:text-sm font-normal text-slate-400">
+            ({items.length}টি)
+          </span>
+        </h2>
+
+        <Link
+          href={categoryHref}
+          className="flex items-center gap-1 text-xs sm:text-sm font-semibold
+            text-blue-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+        >
+          সব দেখুন <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+
+      <DragScroll className="-mx-3 sm:mx-0 px-3 sm:px-0">
+        <div className="flex w-max" style={{ gap: "12px" }}>
+          {items.map((prod, i) => (
+            <div
+              key={prod._id}
+              className="product-card-item flex-shrink-0"
+              style={{ flexShrink: 0 }}
+            >
+              <ProductCard product={prod} priority={i < 5} />
+            </div>
+          ))}
+        </div>
+      </DragScroll>
+
+      <style jsx global>{`
+        .product-card-item {
+          width: calc(50vw - 24px);
+        }
+        @media (min-width: 640px) {
+          .product-card-item {
+            width: 200px;
+          }
+        }
+        @media (min-width: 1024px) {
+          .product-card-item {
+            width: 196px;
+          }
+        }
+        @media (min-width: 1280px) {
+          .product-card-item {
+            width: 224px;
+          }
+        }
+        @media (min-width: 1536px) {
+          .product-card-item {
+            width: 260px;
+          }
+        }
+        .no-scrollbar img,
+        .no-scrollbar [draggable] {
+          -webkit-user-drag: none;
+          user-drag: none;
+        }
+        .no-scrollbar * {
+          -webkit-user-drag: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+    </motion.section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HASH ↔ FILTER MAPS
+   ══════════════════════════════════════════════════════════════ */
+const HASH_FILTER_MAP = {
+  "#cartvan-box": "cartvanBox",
+  "#free-delivery": "freeDelivery",
+  "#best-discount": "bestDiscount",
+};
+
+const FILTER_HASH_MAP = {
+  cartvanBox: "cartvan-box",
+  freeDelivery: "free-delivery",
+  bestDiscount: "best-discount",
+};
+
+/* ══════════════════════════════════════════════════════════════
+   OFFER BADGES
+   ══════════════════════════════════════════════════════════════ */
+const badges = [
+  {
+    key: "freeDelivery",
+    label: "Free Delivery",
+    Icon: FaShippingFast,
+    streakColor: "from-transparent via-orange-200/90 to-transparent",
+    glowColor: "rgba(251,146,60,0.55)",
+    activeBg: "bg-orange-100",
+    activeBorder: "border-orange-400",
+    inactiveBg: "bg-[#FFF5EE]",
+    iconGradient: "from-orange-400 to-red-500",
+    hoverBorder: "hover:border-orange-300",
+    iconAnimate: { x: [0, 3, -1, 3, 0], rotate: [0, -4, 0, 4, 0] },
+  },
+  {
+    key: "bestDiscount",
+    label: "Best Discount",
+    Icon: FaShoppingBag,
+    streakColor: "from-transparent via-indigo-200/90 to-transparent",
+    glowColor: "rgba(99,102,241,0.55)",
+    activeBg: "bg-blue-100",
+    activeBorder: "border-blue-400",
+    inactiveBg: "bg-[#F4F9FF]",
+    iconGradient: "from-blue-400 to-indigo-600",
+    hoverBorder: "hover:border-blue-300",
+    iconAnimate: { rotate: [-8, 8, -8, 8, 0], y: [0, -1, 0, -1, 0] },
+  },
+  {
+    key: "cartvanBox",
+    label: "Cartvan Box",
+    Icon: FaGift,
+    streakColor: "from-transparent via-rose-200/90 to-transparent",
+    glowColor: "rgba(251,113,133,0.55)",
+    activeBg: "bg-rose-100",
+    activeBorder: "border-rose-400",
+    inactiveBg: "bg-rose-50",
+    iconGradient: "from-pink-400 to-rose-500",
+    hoverBorder: "hover:border-rose-300",
+    iconAnimate: { y: [0, -3, 0, -2, 0], scale: [1, 1.15, 1, 1.1, 1] },
+  },
+];
+
+function OfferBadges({ activeFilter, onFilterChange, justActivated }) {
+  const handleClick = (key) => {
+    if (typeof onFilterChange !== "function") return;
+    onFilterChange(activeFilter === key ? null : key);
+  };
+
+  return (
+    <div className="flex flex-nowrap justify-center items-center gap-1 md:gap-8 lg:gap-14 w-full px-1">
+      {badges.map((b) => {
+        const isActive = activeFilter === b.key;
+        const isJustActivated = justActivated === b.key;
+
+        return (
+          <motion.button
+            key={b.key}
+            onClick={() => handleClick(b.key)}
+            whileTap={{ scale: 0.91 }}
+            animate={
+              isJustActivated
+                ? {
+                    scale: [1, 1.18, 0.95, 1.08, 1],
+                    transition: { duration: 0.45, ease: "easeOut" },
+                  }
+                : isActive
+                  ? { scale: [1, 1.07, 1.04], transition: { duration: 0.28 } }
+                  : { scale: 1 }
+            }
+            className={`relative flex items-center gap-1 md:gap-1.5
+              px-2 py-1 md:px-2.5 md:py-1.5 lg:px-3 lg:py-1.5 rounded-md
+              cursor-pointer border overflow-hidden transition-colors duration-300
+              ${
+                isActive
+                  ? `${b.activeBg} ${b.activeBorder}`
+                  : `${b.inactiveBg} border-transparent ${b.hoverBorder}`
+              }`}
+            style={
+              isActive
+                ? {
+                    boxShadow: `0 0 10px 2px ${b.glowColor}, 0 0 22px 5px ${b.glowColor}40`,
+                  }
+                : {}
+            }
+          >
+            {/* Streak 1 */}
+            <motion.span
+              aria-hidden
+              className={`pointer-events-none absolute top-0 left-0 h-full bg-gradient-to-r ${b.streakColor} skew-x-[-20deg]`}
+              style={{ width: "38%" }}
+              animate={{ x: ["-110%", "320%"] }}
+              transition={{
+                duration: isActive ? 0.9 : 1.6,
+                repeat: Infinity,
+                repeatDelay: isActive ? 0.5 : 1.4,
+                ease: [0.4, 0, 0.2, 1],
+              }}
+            />
+            {/* Streak 2 */}
+            <motion.span
+              aria-hidden
+              className={`pointer-events-none absolute top-[30%] left-0 h-[40%] bg-gradient-to-r ${b.streakColor} skew-x-[-20deg] opacity-60`}
+              style={{ width: "18%" }}
+              animate={{ x: ["-110%", "320%"] }}
+              transition={{
+                duration: isActive ? 0.9 : 1.6,
+                repeat: Infinity,
+                repeatDelay: isActive ? 0.5 : 1.4,
+                delay: 0.13,
+                ease: [0.4, 0, 0.2, 1],
+              }}
+            />
+            {/* Glow pulse border */}
+            {isActive && (
+              <motion.span
+                className="pointer-events-none absolute inset-0 rounded-md border-2"
+                style={{ borderColor: b.glowColor }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            )}
+            {/* Navbar থেকে activate হলে extra flash ring */}
+            {isJustActivated && (
+              <motion.span
+                className="pointer-events-none absolute inset-0 rounded-md"
+                style={{ background: b.glowColor }}
+                initial={{ opacity: 0.5, scale: 1 }}
+                animate={{ opacity: 0, scale: 1.5 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              />
+            )}
+            {/* Icon */}
+            <div
+              className={`relative flex items-center justify-center
+                w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6
+                rounded bg-gradient-to-br ${b.iconGradient} text-white flex-shrink-0`}
+            >
+              <motion.div
+                animate={b.iconAnimate}
+                transition={{
+                  duration: 1.8,
+                  repeat: Infinity,
+                  repeatType: "loop",
+                  ease: "easeInOut",
+                }}
+              >
+                <b.Icon className="text-[10px] md:text-[12px] lg:text-[14px]" />
+              </motion.div>
+            </div>
+            {/* Label */}
+            <span className="relative text-[13px] md:text-[18px] lg:text-[20px] font-medium whitespace-nowrap">
+              {b.label}
+            </span>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FILTER LABEL HELPER
+   ══════════════════════════════════════════════════════════════ */
+function filterLabel(activeFilter) {
+  if (activeFilter === "freeDelivery") return "🚚 Free Delivery Products";
+  if (activeFilter === "bestDiscount") return "🛍️ Best Discount Products";
+  if (activeFilter === "cartvanBox") return "🎁 Cartvan Box Products";
+  return "";
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN EXPORT
+   ══════════════════════════════════════════════════════════════ */
 export default function CategoryTabsSection() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeCat, setActiveCat] = useState(null);
   const [error, setError] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(null);
 
-  /* ================= DRAG SCROLL STATE ================= */
-  const scrollRef = useRef(null);
-  const isDownRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-  const velocityRef = useRef(0);
-  const rafRef = useRef(null);
+  // ✅ Navbar থেকে activate হলে bounce flash animation এর জন্য
+  const [justActivated, setJustActivated] = useState(null);
 
-  /* ================= DATA FETCH ================= */
+  const handleFilterChange = (filter, fromExternal = false) => {
+    setActiveFilter(filter);
+
+    // Navbar/hash থেকে activate হলে bounce animation trigger
+    if (filter && fromExternal) {
+      setJustActivated(filter);
+      setTimeout(() => setJustActivated(null), 500);
+    }
+
+    if (filter) {
+      const hash = FILTER_HASH_MAP[filter];
+      if (hash && window.location.hash !== `#${hash}`) {
+        history.replaceState(null, "", `#${hash}`);
+      }
+    } else if (window.location.hash) {
+      history.replaceState(null, "", window.location.pathname);
+    }
+  };
+
+  /* ── Hash → filter (page load + back/forward) ── */
+  useEffect(() => {
+    const applyHashFilter = () => {
+      const hash = window.location.hash.toLowerCase();
+      const filter = HASH_FILTER_MAP[hash] ?? null;
+
+      // fromExternal = true → bounce animation চালু হবে
+      setActiveFilter(filter);
+      if (filter) {
+        setJustActivated(filter);
+        setTimeout(() => setJustActivated(null), 500);
+        setTimeout(() => {
+          const el = document.getElementById("offer-section");
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+      }
+    };
+
+    applyHashFilter();
+    window.addEventListener("hashchange", applyHashFilter);
+    return () => window.removeEventListener("hashchange", applyHashFilter);
+  }, []);
+
+  /* ── Custom event (navbar থেকে) ── */
+  useEffect(() => {
+    const onOfferFilterChange = (e) => {
+      const filter = e.detail ?? null;
+      // fromExternal = true → bounce animation
+      handleFilterChange(filter, true);
+      if (filter) {
+        setTimeout(() => {
+          const el = document.getElementById("offer-section");
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+      }
+    };
+    window.addEventListener("offerFilterChange", onOfferFilterChange);
+    return () =>
+      window.removeEventListener("offerFilterChange", onOfferFilterChange);
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(false);
-
       const [pRes, cRes] = await Promise.all([
         apiFetch("/products"),
         apiFetch("/categories"),
       ]);
-
       let pArr = Array.isArray(pRes) ? pRes : [];
       let cArr = Array.isArray(cRes) ? cRes : [];
-
-      // ✅ only active categories + serial sort
       cArr = cArr.filter((c) => c.isActive !== false);
       cArr.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
-
-      // ✅ ✅ ✅ PRODUCT SERIAL SORT (order ASC)
-      // tie হলে newer first
-      pArr.sort((a, b) => {
-        const ao = Number(a.order ?? 0);
-        const bo = Number(b.order ?? 0);
-        if (ao !== bo) return ao - bo;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-
       setProducts(pArr);
       setCategories(cArr);
-
-      if (activeCat && !cArr.find((c) => String(c._id) === String(activeCat))) {
-        setActiveCat(null);
-      }
-
-      setLoading(false);
     } catch (err) {
-      console.log("Error fetching data:", err);
+      console.error("Fetch error:", err);
       setError(true);
+    } finally {
       setLoading(false);
     }
   };
@@ -69,87 +523,59 @@ export default function CategoryTabsSection() {
     fetchData();
   }, []);
 
-  // ✅ filter + keep serial order stable
-  const filtered = useMemo(() => {
-    const base = !activeCat
-      ? products
-      : products.filter((p) => String(p.category?._id) === String(activeCat));
+  const groups = useMemo(() => {
+    return categories
+      .map((cat) => {
+        const items = products
+          .filter((p) => String(p.category?._id) === String(cat._id))
+          .filter((p) => {
+            if (!activeFilter) return true;
+            if (activeFilter === "freeDelivery")
+              return p.isFreeDelivery === true || p.shippingCost === 0;
+            if (activeFilter === "bestDiscount")
+              return p.discount > 0 || p.hasDiscount === true;
+            if (activeFilter === "cartvanBox")
+              return p.isCartvanBox === true || p.inBox === true;
+            return true;
+          })
+          .sort((a, b) => {
+            const ao = Number(a.order ?? 0),
+              bo = Number(b.order ?? 0);
+            if (ao !== bo) return ao - bo;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
+        return { cat, items };
+      })
+      .filter((g) => g.items.length > 0);
+  }, [categories, products, activeFilter]);
 
-    // ensure sorted (in case API order changes later)
-    return [...base].sort((a, b) => {
-      const ao = Number(a.order ?? 0);
-      const bo = Number(b.order ?? 0);
-      if (ao !== bo) return ao - bo;
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-  }, [activeCat, products]);
-
-  const shouldShowSkeleton =
-    loading || (!error && (products.length === 0 || categories.length === 0));
-
-  const startInertia = () => {
-    const el = scrollRef.current;
+  const handleCatChipClick = (id) => {
+    const el = document.getElementById(`cat-${id}`);
     if (!el) return;
-
-    const step = () => {
-      velocityRef.current *= 0.95;
-      if (Math.abs(velocityRef.current) < 0.5) return;
-
-      el.scrollLeft -= velocityRef.current;
-      rafRef.current = requestAnimationFrame(step);
-    };
-
-    rafRef.current = requestAnimationFrame(step);
+    const top = el.getBoundingClientRect().top + window.scrollY - 72;
+    window.scrollTo({ top, behavior: "smooth" });
   };
 
-  const onMouseDown = (e) => {
-    if (window.innerWidth < 640) return;
-    isDownRef.current = true;
-    scrollRef.current.classList.add("cursor-grabbing");
-    startXRef.current = e.pageX;
-    scrollLeftRef.current = scrollRef.current.scrollLeft;
-    velocityRef.current = 0;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  };
-
-  const onMouseMove = (e) => {
-    if (!isDownRef.current) return;
-    e.preventDefault();
-    const dx = e.pageX - startXRef.current;
-    const walk = dx * 1.1;
-    scrollRef.current.scrollLeft = scrollLeftRef.current - walk;
-    velocityRef.current = walk;
-  };
-
-  const stopDrag = () => {
-    if (!isDownRef.current) return;
-    isDownRef.current = false;
-    scrollRef.current.classList.remove("cursor-grabbing");
-    startInertia();
-  };
-
-  /* ================= ERROR UI ================= */
-  if (error && !loading) {
+  /* ── ERROR ── */
+  if (error && !loading)
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
         <p className="text-gray-500 text-sm mb-4 text-center">
-          ডেটা লোড করা যায়নি। ইন্টারনেট বা সার্ভার সমস্যা হতে পারে।
+          ডেটা লোড করা যায়নি। ইন্টারনেট বা সার্ভার সমস্যা হতে পারে।
         </p>
         <button
           type="button"
           onClick={fetchData}
           className="px-4 py-2 rounded-md text-sm font-medium
-            bg-gradient-to-r from-blue-600 to-purple-600
-            text-white hover:opacity-90 transition"
+            bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition"
         >
           🔄 আবার চেষ্টা করুন
         </button>
       </div>
     );
-  }
 
-  /* ================= SKELETON ================= */
-  if (shouldShowSkeleton) {
+  /* ── SKELETON ── */
+  if (loading || products.length === 0)
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 px-4 py-10">
         {Array.from({ length: 8 }).map((_, i) => (
@@ -157,91 +583,138 @@ export default function CategoryTabsSection() {
         ))}
       </div>
     );
-  }
 
-  /* ================= UI ================= */
+  /* ── MAIN UI ── */
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 40 }}
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="container mx-auto px-4 py-4 sm:px-6 lg:px-8 lg:py-8 "
+      transition={{ duration: 0.45, ease: "easeOut" }}
+      className="mx-auto w-full md:max-w-[920px] lg:max-w-[1080px] xl:max-w-[1280px] 2xl:max-w-[1480px] px-3 sm:px-6 lg:px-8 py-4 lg:py-8 space-y-8"
     >
-      {/* ================= CATEGORY TABS ================= */}
-      <div
-        ref={scrollRef}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={stopDrag}
-        onMouseLeave={stopDrag}
-        className="
-          w-full
-          overflow-x-auto overflow-y-hidden
-          [&::-webkit-scrollbar]:hidden scrollbar-none
-          sm:cursor-grab
-          select-none
-        "
+      {/* ── FILTER BADGES ── */}
+      <motion.div
+        id="offer-section"
+        className="mb-4"
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
       >
-        <div
-          className="
-            /* 📱 MOBILE */
-            grid grid-rows-2 grid-flow-col gap-2 auto-cols-[5rem]
+        <OfferBadges
+          activeFilter={activeFilter}
+          onFilterChange={handleFilterChange}
+          justActivated={justActivated}
+        />
+      </motion.div>
 
-            /* 🖥 DESKTOP */
-            sm:flex sm:flex-wrap sm:justify-center sm:gap-2
-          "
-        >
-          {categories.map((cat) => (
-            <button
-              type="button"
-              key={cat._id}
-              onClick={() =>
-                setActiveCat((prev) => (prev === cat._id ? null : cat._id))
-              }
-              className={`flex-none flex flex-col items-center justify-center
-      px-2 py-1 rounded-xl transition-all duration-300
-      border shadow-sm hover:shadow-md
-      min-w-[65px]
-      ${
-        activeCat === cat._id
-          ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white border-blue-600 scale-105"
-          : "bg-pink-100 hover:bg-pink-200 border-pink-300"
-      }`}
-            >
-              <div className="relative w-10 h-10 overflow-hidden rounded-lg border border-gray-300 m bg-white">
-                <Image
-                  src={cat.image || "/no-image.png"}
-                  alt={cat.name}
-                  fill
-                  sizes="48px"
-                  loading="lazy"
-                  className="object-cover transition-transform duration-300 hover:scale-110"
-                />
+      {/* ── CATEGORY CHIP BAR ── */}
+      <AnimatePresence>
+        {groups.length > 0 && (
+          <motion.div
+            key="chip-bar"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="sticky top-16 z-10 -mx-3 sm:-mx-6 lg:-mx-8 mb-6 bg-pink-50 backdrop-blur-sm border-b border-pink-200"
+          >
+            <DragScroll className="px-3 sm:px-6 lg:px-8 pb-2.5 pt-2">
+              <div className="flex gap-2 w-max">
+                {groups.map(({ cat }) => (
+                  <button
+                    type="button"
+                    key={cat._id}
+                    onClick={() => handleCatChipClick(cat._id)}
+                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 rounded-full
+                      text-xs sm:text-sm font-semibold border border-pink-300 bg-pink-100
+                      text-slate-600 whitespace-nowrap transition-all duration-200
+                      hover:bg-gradient-to-r hover:from-blue-600 hover:to-purple-600 hover:text-white hover:border-transparent"
+                  >
+                    {cat.image && (
+                      <span className="relative w-4 h-4 rounded-sm overflow-hidden flex-shrink-0">
+                        <Image
+                          src={cat.image}
+                          alt={cat.name}
+                          fill
+                          sizes="16px"
+                          className="object-cover"
+                          draggable={false}
+                        />
+                      </span>
+                    )}
+                    {cat.name}
+                  </button>
+                ))}
               </div>
+            </DragScroll>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-              <span className="text-sm text-[11px] font-medium text-center truncate w-full max-w-[150px]">
-                {cat.name}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-4">
-        <OfferBadges />
-      </div>
-
-      {filtered.length ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {filtered.map((prod, i) => (
-            <ProductCard key={prod._id} product={prod} priority={i < 5} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-center text-gray-500 py-10">
-          কোনো প্রোডাক্ট পাওয়া যায়নি।
-        </p>
-      )}
-    </motion.section>
+      {/* ── CATEGORY ROWS / FILTER EMPTY / NO DATA ── */}
+      <AnimatePresence mode="wait">
+        {groups.length > 0 ? (
+          <motion.div
+            key="has-products"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-8"
+          >
+            {groups.map(({ cat, items }, index) => (
+              <CategoryRow
+                key={cat._id}
+                cat={cat}
+                items={items}
+                index={index}
+              />
+            ))}
+          </motion.div>
+        ) : activeFilter ? (
+          <motion.div
+            key={activeFilter}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-sm sm:text-lg font-bold text-gray-800">
+                {filterLabel(activeFilter)}
+              </h2>
+              <div className="flex-1 h-px bg-gray-200" />
+              <button
+                onClick={() => handleFilterChange(null)}
+                className="text-xs text-red-500 flex items-center gap-1 hover:text-red-600 transition-colors"
+              >
+                ✕ Clear Filter
+              </button>
+            </div>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-center text-gray-400 py-10 text-sm"
+            >
+              কোনো প্রোডাক্ট নেই
+            </motion.p>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="no-data"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200"
+          >
+            <p className="text-slate-500 font-medium text-sm sm:text-base">
+              কোনো প্রোডাক্ট পাওয়া যায়নি।
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
