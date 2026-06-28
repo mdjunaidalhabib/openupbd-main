@@ -135,6 +135,52 @@ function DragScroll({ children, className = "" }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   SHARED CARD-ITEM WIDTH STYLES
+   ✅ একই width rule এখন skeleton আর real card দুই জায়গায় ব্যবহার
+   হয়, তাই loading → loaded swap এ width/layout jump (ধাক্কা) হয় না।
+   ══════════════════════════════════════════════════════════════ */
+function CardItemStyles() {
+  return (
+    <style jsx global>{`
+      .product-card-item {
+        width: calc(50vw - 24px);
+      }
+      @media (min-width: 640px) {
+        .product-card-item {
+          width: 200px;
+        }
+      }
+      @media (min-width: 1024px) {
+        .product-card-item {
+          width: 196px;
+        }
+      }
+      @media (min-width: 1280px) {
+        .product-card-item {
+          width: 224px;
+        }
+      }
+      @media (min-width: 1536px) {
+        .product-card-item {
+          width: 260px;
+        }
+      }
+      .no-scrollbar img,
+      .no-scrollbar [draggable] {
+        -webkit-user-drag: none;
+        user-drag: none;
+      }
+      .no-scrollbar * {
+        -webkit-user-drag: none;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+    `}</style>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
    CATEGORY ROW
    ══════════════════════════════════════════════════════════════ */
 function CategoryRow({ cat, items, index = 0 }) {
@@ -192,43 +238,63 @@ function CategoryRow({ cat, items, index = 0 }) {
         </div>
       </DragScroll>
 
-      <style jsx global>{`
-        .product-card-item {
-          width: calc(50vw - 24px);
-        }
-        @media (min-width: 640px) {
-          .product-card-item {
-            width: 200px;
-          }
-        }
-        @media (min-width: 1024px) {
-          .product-card-item {
-            width: 196px;
-          }
-        }
-        @media (min-width: 1280px) {
-          .product-card-item {
-            width: 224px;
-          }
-        }
-        @media (min-width: 1536px) {
-          .product-card-item {
-            width: 260px;
-          }
-        }
-        .no-scrollbar img,
-        .no-scrollbar [draggable] {
-          -webkit-user-drag: none;
-          user-drag: none;
-        }
-        .no-scrollbar * {
-          -webkit-user-drag: none;
-        }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
+      <CardItemStyles />
     </motion.section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HOME LOADING SKELETON
+   ✅ Real layout-এর মতোই: offer badges bar + category chip bar +
+   ২টি horizontal category row — আগের মতো ভিন্ন একটা grid না, যাতে
+   loading → loaded swap এ height/structure আচমকা বদলে "ধাক্কা" না লাগে।
+   ══════════════════════════════════════════════════════════════ */
+function HomeLoadingSkeleton() {
+  const pulse = "animate-pulse bg-slate-200 rounded-md";
+
+  return (
+    <div className="mx-auto w-full md:max-w-[920px] lg:max-w-[1080px] xl:max-w-[1280px] 2xl:max-w-[1480px] px-3 sm:px-6 lg:px-8 py-4 lg:py-8 space-y-8">
+      {/* Offer badges bar placeholder */}
+      <div className="mb-4 flex flex-nowrap justify-center items-center gap-1 md:gap-8 lg:gap-14 w-full px-1">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className={`${pulse} h-[26px] sm:h-[34px] lg:h-[38px] w-[92px] sm:w-[140px] lg:w-[160px] rounded-md`}
+          />
+        ))}
+      </div>
+
+      {/* Category chip bar placeholder */}
+      <div className="-mx-3 sm:-mx-6 lg:-mx-8 mb-6 px-3 sm:px-6 lg:px-8 pb-2.5 pt-2 flex gap-2 w-max">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={`${pulse} h-[34px] sm:h-[40px] w-[90px] sm:w-[110px] rounded-full flex-shrink-0`}
+          />
+        ))}
+      </div>
+
+      {/* Category rows placeholder */}
+      <div className="space-y-8">
+        {[0, 1].map((row) => (
+          <div key={row}>
+            <div className="flex items-center justify-between mb-3">
+              <div className={`${pulse} h-5 w-40`} />
+              <div className={`${pulse} h-4 w-16`} />
+            </div>
+            <div className="flex w-max overflow-hidden" style={{ gap: "12px" }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="product-card-item flex-shrink-0">
+                  <ProductCardSkeleton />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <CardItemStyles />
+    </div>
   );
 }
 
@@ -530,12 +596,9 @@ export default function CategoryTabsSection() {
           .filter((p) => String(p.category?._id) === String(cat._id))
           .filter((p) => {
             if (!activeFilter) return true;
-            if (activeFilter === "freeDelivery")
-              return p.isFreeDelivery === true || p.shippingCost === 0;
-            if (activeFilter === "bestDiscount")
-              return p.discount > 0 || p.hasDiscount === true;
-            if (activeFilter === "cartvanBox")
-              return p.isCartvanBox === true || p.inBox === true;
+            if (activeFilter === "freeDelivery") return p.freeDelivery === true;
+            if (activeFilter === "bestDiscount") return p.bestDiscount === true;
+            if (activeFilter === "cartvanBox") return p.openupBox === true;
             return true;
           })
           .sort((a, b) => {
@@ -559,37 +622,58 @@ export default function CategoryTabsSection() {
   /* ── ERROR ── */
   if (error && !loading)
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4">
-        <p className="text-gray-500 text-sm mb-4 text-center">
-          ডেটা লোড করা যায়নি। ইন্টারনেট বা সার্ভার সমস্যা হতে পারে।
-        </p>
-        <button
-          type="button"
-          onClick={fetchData}
-          className="px-4 py-2 rounded-md text-sm font-medium
-            bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition"
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="error"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="flex flex-col items-center justify-center py-20 px-4"
         >
-          🔄 আবার চেষ্টা করুন
-        </button>
-      </div>
+          <p className="text-gray-500 text-sm mb-4 text-center">
+            ডেটা লোড করা যায়নি। ইন্টারনেট বা সার্ভার সমস্যা হতে পারে।
+          </p>
+          <button
+            type="button"
+            onClick={fetchData}
+            className="px-4 py-2 rounded-md text-sm font-medium
+              bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition"
+          >
+            🔄 আবার চেষ্টা করুন
+          </button>
+        </motion.div>
+      </AnimatePresence>
     );
 
-  /* ── SKELETON ── */
+  /* ── SKELETON ──
+     ✅ এখন skeleton-টা আসল layout-এর (offer badges + chip bar + horizontal
+     category rows) সাথে structurally মিলে যায় — আগে এটা ছিল ৪-কলাম grid,
+     যেটা আসল layout থেকে সম্পূর্ণ আলাদা ছিল, ফলে content আসার সময় height/
+     structure আচমকা বদলে "ধাক্কা" লাগত। একই max-width/padding container আর
+     একই .product-card-item width rule ব্যবহার করায় swap এখন smooth। */
   if (loading || products.length === 0)
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 px-4 py-10">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <ProductCardSkeleton key={i} />
-        ))}
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="skeleton"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <HomeLoadingSkeleton />
+        </motion.div>
+      </AnimatePresence>
     );
 
   /* ── MAIN UI ── */
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
+      key="content"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
       className="mx-auto w-full md:max-w-[920px] lg:max-w-[1080px] xl:max-w-[1280px] 2xl:max-w-[1480px] px-3 sm:px-6 lg:px-8 py-4 lg:py-8 space-y-8"
     >
       {/* ── FILTER BADGES ── */}
