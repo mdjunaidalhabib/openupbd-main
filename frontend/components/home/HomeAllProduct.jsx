@@ -136,8 +136,6 @@ function DragScroll({ children, className = "" }) {
 
 /* ══════════════════════════════════════════════════════════════
    SHARED CARD-ITEM WIDTH STYLES
-   ✅ একই width rule এখন skeleton আর real card দুই জায়গায় ব্যবহার
-   হয়, তাই loading → loaded swap এ width/layout jump (ধাক্কা) হয় না।
    ══════════════════════════════════════════════════════════════ */
 function CardItemStyles() {
   return (
@@ -245,9 +243,6 @@ function CategoryRow({ cat, items, index = 0 }) {
 
 /* ══════════════════════════════════════════════════════════════
    HOME LOADING SKELETON
-   ✅ Real layout-এর মতোই: offer badges bar + category chip bar +
-   ২টি horizontal category row — আগের মতো ভিন্ন একটা grid না, যাতে
-   loading → loaded swap এ height/structure আচমকা বদলে "ধাক্কা" না লাগে।
    ══════════════════════════════════════════════════════════════ */
 function HomeLoadingSkeleton() {
   const pulse = "animate-pulse bg-slate-200 rounded-md";
@@ -499,14 +494,11 @@ export default function CategoryTabsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeFilter, setActiveFilter] = useState(null);
-
-  // ✅ Navbar থেকে activate হলে bounce flash animation এর জন্য
   const [justActivated, setJustActivated] = useState(null);
 
   const handleFilterChange = (filter, fromExternal = false) => {
     setActiveFilter(filter);
 
-    // Navbar/hash থেকে activate হলে bounce animation trigger
     if (filter && fromExternal) {
       setJustActivated(filter);
       setTimeout(() => setJustActivated(null), 500);
@@ -527,8 +519,6 @@ export default function CategoryTabsSection() {
     const applyHashFilter = () => {
       const hash = window.location.hash.toLowerCase();
       const filter = HASH_FILTER_MAP[hash] ?? null;
-
-      // fromExternal = true → bounce animation চালু হবে
       setActiveFilter(filter);
       if (filter) {
         setJustActivated(filter);
@@ -549,7 +539,6 @@ export default function CategoryTabsSection() {
   useEffect(() => {
     const onOfferFilterChange = (e) => {
       const filter = e.detail ?? null;
-      // fromExternal = true → bounce animation
       handleFilterChange(filter, true);
       if (filter) {
         setTimeout(() => {
@@ -589,18 +578,31 @@ export default function CategoryTabsSection() {
     fetchData();
   }, []);
 
+  /* ── Filter active হলে flat product list ── */
+  const filteredProducts = useMemo(() => {
+    if (!activeFilter) return [];
+    return products
+      .filter((p) => {
+        if (activeFilter === "freeDelivery") return p.freeDelivery === true;
+        if (activeFilter === "bestDiscount") return p.bestDiscount === true;
+        if (activeFilter === "cartvanBox") return p.openupBox === true;
+        return false;
+      })
+      .sort((a, b) => {
+        const ao = Number(a.order ?? 0),
+          bo = Number(b.order ?? 0);
+        if (ao !== bo) return ao - bo;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+  }, [products, activeFilter]);
+
+  /* ── Filter নেই → category groups ── */
   const groups = useMemo(() => {
+    if (activeFilter) return [];
     return categories
       .map((cat) => {
         const items = products
           .filter((p) => String(p.category?._id) === String(cat._id))
-          .filter((p) => {
-            if (!activeFilter) return true;
-            if (activeFilter === "freeDelivery") return p.freeDelivery === true;
-            if (activeFilter === "bestDiscount") return p.bestDiscount === true;
-            if (activeFilter === "cartvanBox") return p.openupBox === true;
-            return true;
-          })
           .sort((a, b) => {
             const ao = Number(a.order ?? 0),
               bo = Number(b.order ?? 0);
@@ -646,12 +648,7 @@ export default function CategoryTabsSection() {
       </AnimatePresence>
     );
 
-  /* ── SKELETON ──
-     ✅ এখন skeleton-টা আসল layout-এর (offer badges + chip bar + horizontal
-     category rows) সাথে structurally মিলে যায় — আগে এটা ছিল ৪-কলাম grid,
-     যেটা আসল layout থেকে সম্পূর্ণ আলাদা ছিল, ফলে content আসার সময় height/
-     structure আচমকা বদলে "ধাক্কা" লাগত। একই max-width/padding container আর
-     একই .product-card-item width rule ব্যবহার করায় swap এখন smooth। */
+  /* ── SKELETON ── */
   if (loading || products.length === 0)
     return (
       <AnimatePresence mode="wait">
@@ -691,9 +688,9 @@ export default function CategoryTabsSection() {
         />
       </motion.div>
 
-      {/* ── CATEGORY CHIP BAR ── */}
+      {/* ── CATEGORY CHIP BAR — শুধু filter নেই তখন ── */}
       <AnimatePresence>
-        {groups.length > 0 && (
+        {!activeFilter && groups.length > 0 && (
           <motion.div
             key="chip-bar"
             initial={{ opacity: 0, y: -10 }}
@@ -735,9 +732,69 @@ export default function CategoryTabsSection() {
         )}
       </AnimatePresence>
 
-      {/* ── CATEGORY ROWS / FILTER EMPTY / NO DATA ── */}
+      {/* ══════════════════════════════════════════════════════
+          FILTER ACTIVE → FLAT PRODUCT GRID (category নেই)
+          ══════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
-        {groups.length > 0 ? (
+        {activeFilter ? (
+          <motion.div
+            key={activeFilter}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            {/* Header row */}
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm sm:text-lg font-bold text-gray-800">
+                {filterLabel(activeFilter)}
+              </h2>
+              <span className="text-xs sm:text-sm font-normal text-slate-400">
+                ({filteredProducts.length}টি)
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+              <button
+                onClick={() => handleFilterChange(null)}
+                className="text-xs text-red-500 flex items-center gap-1 hover:text-red-600 transition-colors whitespace-nowrap"
+              >
+                ✕ Clear Filter
+              </button>
+            </div>
+
+            {/* Products grid অথবা empty */}
+            {filteredProducts.length === 0 ? (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="text-center text-gray-400 py-10 text-sm"
+              >
+                কোনো প্রোডাক্ট নেই
+              </motion.p>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2, delay: 0.05 }}
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3"
+              >
+                {filteredProducts.map((prod, i) => (
+                  <motion.div
+                    key={prod._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: i * 0.03 }}
+                  >
+                    <ProductCard product={prod} priority={i < 6} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </motion.div>
+        ) : groups.length > 0 ? (
+          /* ══════════════════════════════════════════════════
+             FILTER নেই → NORMAL CATEGORY ROWS
+             ══════════════════════════════════════════════════ */
           <motion.div
             key="has-products"
             initial={{ opacity: 0 }}
@@ -755,36 +812,10 @@ export default function CategoryTabsSection() {
               />
             ))}
           </motion.div>
-        ) : activeFilter ? (
-          <motion.div
-            key={activeFilter}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-sm sm:text-lg font-bold text-gray-800">
-                {filterLabel(activeFilter)}
-              </h2>
-              <div className="flex-1 h-px bg-gray-200" />
-              <button
-                onClick={() => handleFilterChange(null)}
-                className="text-xs text-red-500 flex items-center gap-1 hover:text-red-600 transition-colors"
-              >
-                ✕ Clear Filter
-              </button>
-            </div>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-center text-gray-400 py-10 text-sm"
-            >
-              কোনো প্রোডাক্ট নেই
-            </motion.p>
-          </motion.div>
         ) : (
+          /* ══════════════════════════════════════════════════
+             কোনো ডেটা নেই
+             ══════════════════════════════════════════════════ */
           <motion.div
             key="no-data"
             initial={{ opacity: 0 }}

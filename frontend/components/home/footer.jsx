@@ -125,7 +125,7 @@ export default function Footer() {
                       href={social.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-10 h-10 rounded-full bg-gray-800 hover:bg-orange-600 transition flex items-center justify-center"
+                      className="w-10 h-10 rounded-full bg-pink-600 hover:bg-pink-700 transition flex items-center justify-center"
                     >
                       <Icon />
                     </Link>
@@ -143,7 +143,7 @@ export default function Footer() {
                 <li key={i}>
                   <Link
                     href={item.href}
-                    className="hover:text-orange-500 transition"
+                    className="hover:text-pink-600 transition"
                   >
                     {item.label}
                   </Link>
@@ -212,7 +212,7 @@ export default function Footer() {
               href="https://hikmahit.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-orange-500 hover:underline"
+              className="text-orange-500 hover:text-orange-600 hover:underline"
             >
               Hikmah IT
             </a>
