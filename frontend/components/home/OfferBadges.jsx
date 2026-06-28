@@ -16,10 +16,7 @@ const badges = [
     inactiveBg: "bg-[#FFF5EE]",
     iconGradient: "from-orange-400 to-red-500",
     hoverBorder: "hover:border-orange-300",
-    iconAnimate: {
-      x: [0, 3, -1, 3, 0],
-      rotate: [0, -4, 0, 4, 0],
-    },
+    iconAnimate: { x: [0, 3, -1, 3, 0], rotate: [0, -4, 0, 4, 0] },
   },
   {
     key: "bestDiscount",
@@ -32,10 +29,7 @@ const badges = [
     inactiveBg: "bg-[#F4F9FF]",
     iconGradient: "from-blue-400 to-indigo-600",
     hoverBorder: "hover:border-blue-300",
-    iconAnimate: {
-      rotate: [-8, 8, -8, 8, 0],
-      y: [0, -1, 0, -1, 0],
-    },
+    iconAnimate: { rotate: [-8, 8, -8, 8, 0], y: [0, -1, 0, -1, 0] },
   },
   {
     key: "openupBox",
@@ -48,16 +42,15 @@ const badges = [
     inactiveBg: "bg-rose-50",
     iconGradient: "from-pink-400 to-rose-500",
     hoverBorder: "hover:border-rose-300",
-    iconAnimate: {
-      y: [0, -3, 0, -2, 0],
-      scale: [1, 1.15, 1, 1.1, 1],
-    },
+    iconAnimate: { y: [0, -3, 0, -2, 0], scale: [1, 1.15, 1, 1.1, 1] },
   },
 ];
 
-// ✅ Function নাম OfferBadges করা হয়েছে — import এর সাথে match করতে
-export default function OfferBadges({ activeFilter, onFilterChange }) {
-  // ✅ onFilterChange না থাকলে crash করবে না
+export default function OfferBadges({
+  activeFilter,
+  onFilterChange,
+  justActivated,
+}) {
   const handleClick = (key) => {
     if (typeof onFilterChange !== "function") return;
     onFilterChange(activeFilter === key ? null : key);
@@ -67,6 +60,7 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
     <div className="flex flex-nowrap justify-center items-center gap-1 md:gap-8 lg:gap-14 w-full px-1">
       {badges.map((b) => {
         const isActive = activeFilter === b.key;
+        const isJustActivated = justActivated === b.key;
 
         return (
           <motion.button
@@ -74,14 +68,18 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
             onClick={() => handleClick(b.key)}
             whileTap={{ scale: 0.91 }}
             animate={
-              isActive
-                ? { scale: [1, 1.07, 1.04], transition: { duration: 0.28 } }
-                : { scale: 1 }
+              isJustActivated
+                ? {
+                    scale: [1, 1.18, 0.95, 1.08, 1],
+                    transition: { duration: 0.45, ease: "easeOut" },
+                  }
+                : isActive
+                  ? { scale: [1, 1.07, 1.04], transition: { duration: 0.28 } }
+                  : { scale: 1 }
             }
             className={`relative flex items-center gap-1 md:gap-1.5
               px-2 py-1 md:px-2.5 md:py-1.5 lg:px-3 lg:py-1.5 rounded-md
-              cursor-pointer border overflow-hidden
-              transition-colors duration-300
+              cursor-pointer border overflow-hidden transition-colors duration-300
               ${
                 isActive
                   ? `${b.activeBg} ${b.activeBorder}`
@@ -95,7 +93,7 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
                 : {}
             }
           >
-            {/* ── Streak ── */}
+            {/* Streak 1 */}
             <motion.span
               aria-hidden
               className={`pointer-events-none absolute top-0 left-0 h-full bg-gradient-to-r ${b.streakColor} skew-x-[-20deg]`}
@@ -108,7 +106,7 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
                 ease: [0.4, 0, 0.2, 1],
               }}
             />
-
+            {/* Streak 2 */}
             <motion.span
               aria-hidden
               className={`pointer-events-none absolute top-[30%] left-0 h-[40%] bg-gradient-to-r ${b.streakColor} skew-x-[-20deg] opacity-60`}
@@ -122,8 +120,7 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
                 ease: [0.4, 0, 0.2, 1],
               }}
             />
-
-            {/* ── Active glow pulse border ── */}
+            {/* Active glow pulse border */}
             {isActive && (
               <motion.span
                 className="pointer-events-none absolute inset-0 rounded-md border-2"
@@ -136,8 +133,17 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
                 }}
               />
             )}
-
-            {/* ── Icon ── */}
+            {/* Flash ring — navbar থেকে activate হলে */}
+            {isJustActivated && (
+              <motion.span
+                className="pointer-events-none absolute inset-0 rounded-md"
+                style={{ background: b.glowColor }}
+                initial={{ opacity: 0.5, scale: 1 }}
+                animate={{ opacity: 0, scale: 1.5 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              />
+            )}
+            {/* Icon */}
             <div
               className={`relative flex items-center justify-center
                 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6
@@ -155,8 +161,7 @@ export default function OfferBadges({ activeFilter, onFilterChange }) {
                 <b.Icon className="text-[10px] md:text-[12px] lg:text-[14px]" />
               </motion.div>
             </div>
-
-            {/* ── Label ── */}
+            {/* Label */}
             <span className="relative text-[13px] md:text-[18px] lg:text-[20px] font-medium whitespace-nowrap">
               {b.label}
             </span>

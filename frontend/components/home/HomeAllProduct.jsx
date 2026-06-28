@@ -5,10 +5,10 @@ import Link from "next/link";
 import { apiFetch } from "../../utils/api";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { FaShippingFast, FaShoppingBag, FaGift } from "react-icons/fa";
 
 import ProductCard from "./ProductCard";
 import ProductCardSkeleton from "../skeletons/ProductCardSkeleton";
+import OfferBadges from "./OfferBadges";
 
 /* ══════════════════════════════════════════════════════════════
    DRAG-SCROLL WRAPPER
@@ -249,7 +249,6 @@ function HomeLoadingSkeleton() {
 
   return (
     <div className="mx-auto w-full md:max-w-[920px] lg:max-w-[1080px] xl:max-w-[1280px] 2xl:max-w-[1480px] px-3 sm:px-6 lg:px-8 py-4 lg:py-8 space-y-8">
-      {/* Offer badges bar placeholder */}
       <div className="mb-4 flex flex-nowrap justify-center items-center gap-1 md:gap-8 lg:gap-14 w-full px-1">
         {[0, 1, 2].map((i) => (
           <div
@@ -259,7 +258,6 @@ function HomeLoadingSkeleton() {
         ))}
       </div>
 
-      {/* Category chip bar placeholder */}
       <div className="-mx-3 sm:-mx-6 lg:-mx-8 mb-6 px-3 sm:px-6 lg:px-8 pb-2.5 pt-2 flex gap-2 w-max">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
@@ -269,7 +267,6 @@ function HomeLoadingSkeleton() {
         ))}
       </div>
 
-      {/* Category rows placeholder */}
       <div className="space-y-8">
         {[0, 1].map((row) => (
           <div key={row}>
@@ -309,179 +306,12 @@ const FILTER_HASH_MAP = {
 };
 
 /* ══════════════════════════════════════════════════════════════
-   OFFER BADGES
-   ══════════════════════════════════════════════════════════════ */
-const badges = [
-  {
-    key: "freeDelivery",
-    label: "Free Delivery",
-    Icon: FaShippingFast,
-    streakColor: "from-transparent via-orange-200/90 to-transparent",
-    glowColor: "rgba(251,146,60,0.55)",
-    activeBg: "bg-orange-100",
-    activeBorder: "border-orange-400",
-    inactiveBg: "bg-[#FFF5EE]",
-    iconGradient: "from-orange-400 to-red-500",
-    hoverBorder: "hover:border-orange-300",
-    iconAnimate: { x: [0, 3, -1, 3, 0], rotate: [0, -4, 0, 4, 0] },
-  },
-  {
-    key: "bestDiscount",
-    label: "Best Discount",
-    Icon: FaShoppingBag,
-    streakColor: "from-transparent via-indigo-200/90 to-transparent",
-    glowColor: "rgba(99,102,241,0.55)",
-    activeBg: "bg-blue-100",
-    activeBorder: "border-blue-400",
-    inactiveBg: "bg-[#F4F9FF]",
-    iconGradient: "from-blue-400 to-indigo-600",
-    hoverBorder: "hover:border-blue-300",
-    iconAnimate: { rotate: [-8, 8, -8, 8, 0], y: [0, -1, 0, -1, 0] },
-  },
-  {
-    key: "openupBox",
-    label: "Cartvan Box",
-    Icon: FaGift,
-    streakColor: "from-transparent via-rose-200/90 to-transparent",
-    glowColor: "rgba(251,113,133,0.55)",
-    activeBg: "bg-rose-100",
-    activeBorder: "border-rose-400",
-    inactiveBg: "bg-rose-50",
-    iconGradient: "from-pink-400 to-rose-500",
-    hoverBorder: "hover:border-rose-300",
-    iconAnimate: { y: [0, -3, 0, -2, 0], scale: [1, 1.15, 1, 1.1, 1] },
-  },
-];
-
-function OfferBadges({ activeFilter, onFilterChange, justActivated }) {
-  const handleClick = (key) => {
-    if (typeof onFilterChange !== "function") return;
-    onFilterChange(activeFilter === key ? null : key);
-  };
-
-  return (
-    <div className="flex flex-nowrap justify-center items-center gap-1 md:gap-8 lg:gap-14 w-full px-1">
-      {badges.map((b) => {
-        const isActive = activeFilter === b.key;
-        const isJustActivated = justActivated === b.key;
-
-        return (
-          <motion.button
-            key={b.key}
-            onClick={() => handleClick(b.key)}
-            whileTap={{ scale: 0.91 }}
-            animate={
-              isJustActivated
-                ? {
-                    scale: [1, 1.18, 0.95, 1.08, 1],
-                    transition: { duration: 0.45, ease: "easeOut" },
-                  }
-                : isActive
-                  ? { scale: [1, 1.07, 1.04], transition: { duration: 0.28 } }
-                  : { scale: 1 }
-            }
-            className={`relative flex items-center gap-1 md:gap-1.5
-              px-2 py-1 md:px-2.5 md:py-1.5 lg:px-3 lg:py-1.5 rounded-md
-              cursor-pointer border overflow-hidden transition-colors duration-300
-              ${
-                isActive
-                  ? `${b.activeBg} ${b.activeBorder}`
-                  : `${b.inactiveBg} border-transparent ${b.hoverBorder}`
-              }`}
-            style={
-              isActive
-                ? {
-                    boxShadow: `0 0 10px 2px ${b.glowColor}, 0 0 22px 5px ${b.glowColor}40`,
-                  }
-                : {}
-            }
-          >
-            {/* Streak 1 */}
-            <motion.span
-              aria-hidden
-              className={`pointer-events-none absolute top-0 left-0 h-full bg-gradient-to-r ${b.streakColor} skew-x-[-20deg]`}
-              style={{ width: "38%" }}
-              animate={{ x: ["-110%", "320%"] }}
-              transition={{
-                duration: isActive ? 0.9 : 1.6,
-                repeat: Infinity,
-                repeatDelay: isActive ? 0.5 : 1.4,
-                ease: [0.4, 0, 0.2, 1],
-              }}
-            />
-            {/* Streak 2 */}
-            <motion.span
-              aria-hidden
-              className={`pointer-events-none absolute top-[30%] left-0 h-[40%] bg-gradient-to-r ${b.streakColor} skew-x-[-20deg] opacity-60`}
-              style={{ width: "18%" }}
-              animate={{ x: ["-110%", "320%"] }}
-              transition={{
-                duration: isActive ? 0.9 : 1.6,
-                repeat: Infinity,
-                repeatDelay: isActive ? 0.5 : 1.4,
-                delay: 0.13,
-                ease: [0.4, 0, 0.2, 1],
-              }}
-            />
-            {/* Glow pulse border */}
-            {isActive && (
-              <motion.span
-                className="pointer-events-none absolute inset-0 rounded-md border-2"
-                style={{ borderColor: b.glowColor }}
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{
-                  duration: 1.3,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            )}
-            {/* Navbar থেকে activate হলে extra flash ring */}
-            {isJustActivated && (
-              <motion.span
-                className="pointer-events-none absolute inset-0 rounded-md"
-                style={{ background: b.glowColor }}
-                initial={{ opacity: 0.5, scale: 1 }}
-                animate={{ opacity: 0, scale: 1.5 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-              />
-            )}
-            {/* Icon */}
-            <div
-              className={`relative flex items-center justify-center
-                w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6
-                rounded bg-gradient-to-br ${b.iconGradient} text-white flex-shrink-0`}
-            >
-              <motion.div
-                animate={b.iconAnimate}
-                transition={{
-                  duration: 1.8,
-                  repeat: Infinity,
-                  repeatType: "loop",
-                  ease: "easeInOut",
-                }}
-              >
-                <b.Icon className="text-[10px] md:text-[12px] lg:text-[14px]" />
-              </motion.div>
-            </div>
-            {/* Label */}
-            <span className="relative text-[13px] md:text-[18px] lg:text-[20px] font-medium whitespace-nowrap">
-              {b.label}
-            </span>
-          </motion.button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════
    FILTER LABEL HELPER
    ══════════════════════════════════════════════════════════════ */
 function filterLabel(activeFilter) {
   if (activeFilter === "freeDelivery") return "🚚 Free Delivery Products";
   if (activeFilter === "bestDiscount") return "🛍️ Best Discount Products";
-  if (activeFilter === "openupBox") return "🎁 Cartvan Box Products";
+  if (activeFilter === "openupBox") return "🎁 Openup Box Products";
   return "";
 }
 
@@ -688,7 +518,7 @@ export default function CategoryTabsSection() {
         />
       </motion.div>
 
-      {/* ── CATEGORY CHIP BAR — শুধু filter নেই তখন ── */}
+      {/* ── CATEGORY CHIP BAR ── */}
       <AnimatePresence>
         {!activeFilter && groups.length > 0 && (
           <motion.div
@@ -733,7 +563,7 @@ export default function CategoryTabsSection() {
       </AnimatePresence>
 
       {/* ══════════════════════════════════════════════════════
-          FILTER ACTIVE → FLAT PRODUCT GRID (category নেই)
+          FILTER ACTIVE → FLAT PRODUCT GRID
           ══════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
         {activeFilter ? (
@@ -744,7 +574,6 @@ export default function CategoryTabsSection() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            {/* Header row */}
             <div className="flex items-center gap-2 mb-4">
               <h2 className="text-sm sm:text-lg font-bold text-gray-800">
                 {filterLabel(activeFilter)}
@@ -761,7 +590,6 @@ export default function CategoryTabsSection() {
               </button>
             </div>
 
-            {/* Products grid অথবা empty */}
             {filteredProducts.length === 0 ? (
               <motion.p
                 initial={{ opacity: 0 }}
