@@ -297,13 +297,13 @@ function HomeLoadingSkeleton() {
    HASH ↔ FILTER MAPS
    ══════════════════════════════════════════════════════════════ */
 const HASH_FILTER_MAP = {
-  "#cartvan-box": "cartvanBox",
+  "#openup-box": "openupBox",
   "#free-delivery": "freeDelivery",
   "#best-discount": "bestDiscount",
 };
 
 const FILTER_HASH_MAP = {
-  cartvanBox: "cartvan-box",
+  openupBox: "openup-box",
   freeDelivery: "free-delivery",
   bestDiscount: "best-discount",
 };
@@ -339,7 +339,7 @@ const badges = [
     iconAnimate: { rotate: [-8, 8, -8, 8, 0], y: [0, -1, 0, -1, 0] },
   },
   {
-    key: "cartvanBox",
+    key: "openupBox",
     label: "Cartvan Box",
     Icon: FaGift,
     streakColor: "from-transparent via-rose-200/90 to-transparent",
@@ -481,7 +481,7 @@ function OfferBadges({ activeFilter, onFilterChange, justActivated }) {
 function filterLabel(activeFilter) {
   if (activeFilter === "freeDelivery") return "🚚 Free Delivery Products";
   if (activeFilter === "bestDiscount") return "🛍️ Best Discount Products";
-  if (activeFilter === "cartvanBox") return "🎁 Cartvan Box Products";
+  if (activeFilter === "openupBox") return "🎁 Cartvan Box Products";
   return "";
 }
 
@@ -585,7 +585,7 @@ export default function CategoryTabsSection() {
       .filter((p) => {
         if (activeFilter === "freeDelivery") return p.freeDelivery === true;
         if (activeFilter === "bestDiscount") return p.bestDiscount === true;
-        if (activeFilter === "cartvanBox") return p.openupBox === true;
+        if (activeFilter === "openupBox") return p.openupBox === true;
         return false;
       })
       .sort((a, b) => {
